@@ -86,6 +86,7 @@
   .card.executing { border-left-color: #22c55e; }
   .card.finished { border-left-color: #3b82f6; }
   .card.error { border-left-color: #ef4444; }
+  .card.waiting_for_decision { border-left-color: #f59e0b; }
   .card-header {
     display: flex;
     justify-content: space-between;
@@ -103,6 +104,7 @@
   .badge.executing { background: #14532d; color: #86efac; }
   .badge.finished { background: #1e3a8a; color: #93c5fd; }
   .badge.error { background: #7f1d1d; color: #fca5a5; }
+  .badge.waiting_for_decision { background: #451a03; color: #fcd34d; }
   .section {
     margin-top: 12px;
     padding-top: 12px;
@@ -252,7 +254,7 @@
           <div class="row"><span class="label">Dispatch ID</span><span class="value">${ex.dispatch_id ?? '—'}</span></div>
           <div class="row"><span class="label">Instância</span><span class="value">${ex.instance ?? '—'}</span></div>
           <div class="row"><span class="label">Total mensagens</span><span class="value">${ex.total_messages ?? '—'}</span></div>
-          <div class="row"><span class="label">Templates ativos</span><span class="value">${ex.templates_active ?? '—'}</span></div>
+          <div class="row"><span class="label">Templates</span><span class="value">${ex.templates ? `${ex.templates.active} ativo / ${ex.templates.suspended} susp. / ${ex.templates.paused} pausado (total: ${ex.templates.total})` : '—'}</span></div>
         </div>
 
         <div class="section">
@@ -292,6 +294,7 @@
           <div class="section-title">Watcher / APIs</div>
           <div class="row"><span class="label">Estado</span><span class="value">${watcher.state || '—'}</span></div>
           <div class="row"><span class="label">Descrição</span><span class="value" style="font-size:11px">${watcher.description || '—'}</span></div>
+          ${watcher.decision_timeout_remaining_min !== null && watcher.decision_timeout_remaining_min !== undefined ? `<div class="row"><span class="label">Timeout decisão</span><span class="value" style="color:#fcd34d">${fmt(watcher.decision_timeout_remaining_min)} min</span></div>` : ''}
           <div class="row"><span class="label">Admin backend</span><span class="value">${apis.admin_backend ? '✅' : '❌'}</span></div>
         </div>
 
@@ -301,6 +304,10 @@
             <div class="row"><span class="label">Motivo</span><span class="value">${d.finalization.reason}</span></div>
             <div class="row"><span class="label">Runtime</span><span class="value">${fmt(d.finalization.runtime_min)} min</span></div>
             <div class="row"><span class="label">Coletas</span><span class="value">${d.finalization.collections}</span></div>
+            <div class="row"><span class="label">Taxa final</span><span class="value">${fmt(d.finalization.final_rate_per_min)} msg/min</span></div>
+            <div class="row"><span class="label">Sucesso final</span><span class="value">${fmt(d.finalization.final_success_rate_percent)}%</span></div>
+            <div class="row"><span class="label">Total final</span><span class="value">${d.finalization.final_total_processed ?? '—'}</span></div>
+            ${d.finalization.summary ? `<div class="row" style="margin-top:6px"><span class="label" style="color:#64748b;font-size:11px">${d.finalization.summary}</span></div>` : ''}
           </div>
         ` : ''}
       </div>
