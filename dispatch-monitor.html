@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Dispatch Status Monitor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #1e293b;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  h1 { font-size: 22px; font-weight: 600; }
+  .controls { display: flex; gap: 10px; align-items: center; }
+  input[type="text"] {
+    padding: 8px 12px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    border-radius: 6px;
+    width: 320px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+  button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: opacity 0.2s;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-connect { background: #22c55e; color: white; }
+  .btn-disconnect { background: #ef4444; color: white; }
+  .btn-clear { background: #475569; color: white; }
+  .status-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: #1e293b;
+    border-radius: 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .dot-connected { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  .dot-disconnected { background: #ef4444; }
+  .dot-connecting { background: #f59e0b; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .meta { color: #94a3b8; }
+  .meta strong { color: #e2e8f0; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px;
+    border-left: 4px solid #64748b;
+  }
+  .card.executing { border-left-color: #22c55e; }
+  .card.finished { border-left-color: #3b82f6; }
+  .card.error { border-left-color: #ef4444; }
+  .card.waiting_for_decision { border-left-color: #f59e0b; }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .card-title { font-weight: 600; font-size: 15px; }
+  .badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge.executing { background: #14532d; color: #86efac; }
+  .badge.finished { background: #1e3a8a; color: #93c5fd; }
+  .badge.error { background: #7f1d1d; color: #fca5a5; }
+  .badge.waiting_for_decision { background: #451a03; color: #fcd34d; }
+  .version-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .version-tag.v2 { background: #312e81; color: #a5b4fc; }
+  .version-tag.v3 { background: #134e4a; color: #5eead4; }
+  .section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #334155;
+  }
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 2px 0;
+  }
+  .row .label { color: #94a3b8; }
+  .row .value { font-family: monospace; color: #e2e8f0; }
+  .progress {
+    height: 6px;
+    background: #0f172a;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #3b82f6);
+    transition: width 0.3s;
+  }
+  .progress-bar.warn { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+    font-style: italic;
+  }
+  .log {
+    margin-top: 20px;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .log-entry { padding: 2px 0; color: #94a3b8; }
+  .log-entry.error { color: #fca5a5; }
+  .log-entry.success { color: #86efac; }
+  .log-entry.info { color: #93c5fd; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>📡 Dispatch Status Monitor</h1>
+    <div class="controls">
+      <input type="text" id="wsUrl" value="ws://127.0.0.1:8020/ws/dispatch-status">
+      <button class="btn-connect" id="btnConnect">Conectar</button>
+      <button class="btn-disconnect" id="btnDisconnect" disabled>Desconectar</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <span><span class="status-dot dot-disconnected" id="statusDot"></span><span id="statusText">Desconectado</span></span>
+    <span class="meta">Task ID: <strong id="taskId">—</strong></span>
+    <span class="meta">Última atualização: <strong id="lastUpdate">—</strong></span>
+    <span class="meta">v2: <strong id="totalV2">0</strong> | v3: <strong id="totalV3">0</strong></span>
+    <span class="meta">Mensagens recebidas: <strong id="msgCount">0</strong></span>
+  </div>
+
+  <div id="cards" class="grid">
+    <div class="empty">Aguardando conexão WebSocket...</div>
+  </div>
+
+  <div class="log" id="log"></div>
+
+<script>
+(function() {
+  let ws = null;
+  let msgCount = 0;
+
+  const $ = id => document.getElementById(id);
+  const btnConnect = $('btnConnect');
+  const btnDisconnect = $('btnDisconnect');
+  const statusDot = $('statusDot');
+  const statusText = $('statusText');
+  const cardsEl = $('cards');
+  const logEl = $('log');
+
+  function setStatus(state, text) {
+    statusDot.className = 'status-dot dot-' + state;
+    statusText.textContent = text;
+  }
+
+  function log(message, type = 'info') {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + message;
+    logEl.insertBefore(entry, logEl.firstChild);
+    while (logEl.children.length > 50) logEl.removeChild(logEl.lastChild);
+  }
+
+  function fmt(v, decimals = 1) {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'number') return decimals > 0 ? v.toFixed(decimals) : v.toString();
+    return v;
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('pt-BR'); }
+    catch { return iso; }
+  }
+
+  function pct(value, max) {
+    if (!max || max === 0) return 0;
+    return Math.min(100, (value / max) * 100);
+  }
+
+  function buildCard(d) {
+    const status = (d.status || 'unknown').toLowerCase();
+    const version = d._version || '';
+    const sys = d.system || {};
+    const wk = d.workers || {};
+    const tp = d.throughput || {};
+    const q = d.queues || {};
+    const ex = d.execution || {};
+    const apis = d.apis || {};
+    const watcher = d.instance_watcher || {};
+    const memWarn = (sys.memory_percent || 0) > 80;
+    const cpuWarn = (sys.cpu_percent || 0) > 80;
+
+    return `
+      <div class="card ${status}">
+        <div class="card-header">
+          <div class="card-title">
+            ${d.instance_name || 'unknown'}
+            ${version ? `<span class="version-tag ${version}">${version.toUpperCase()}</span>` : ''}
+          </div>
+          <div class="badge ${status}">${status}</div>
+        </div>
+        <div class="row"><span class="label">Timestamp</span><span class="value">${fmtTime(d.timestamp)}</span></div>
+
+        <div class="section">
+          <div class="section-title">Execução</div>
+          <div class="row"><span class="label">ID</span><span class="value">${ex.id ?? '—'}</span></div>
+          <div class="row"><span class="label">Dispatch ID</span><span class="value">${ex.dispatch_id ?? '—'}</span></div>
+          <div class="row"><span class="label">Instância</span><span class="value">${ex.instance ?? '—'}</span></div>
+          <div class="row"><span class="label">Total mensagens</span><span class="value">${ex.total_messages ?? '—'}</span></div>
+          <div class="row"><span class="label">Templates</span><span class="value">${ex.templates ? `${ex.templates.active} ativo / ${ex.templates.suspended} susp. / ${ex.templates.paused} pausado (total: ${ex.templates.total})` : '—'}</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Throughput</div>
+          <div class="row"><span class="label">Taxa/min</span><span class="value">${fmt(tp.rate_per_min)}</span></div>
+          <div class="row"><span class="label">Sucesso</span><span class="value">${fmt(tp.success_rate_percent)}%</span></div>
+          <div class="row"><span class="label">Total processado</span><span class="value">${tp.total_processed ?? '—'}</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Filas</div>
+          <div class="row"><span class="label">Work</span><span class="value">${q.work}/${q.work_max}</span></div>
+          <div class="progress"><div class="progress-bar" style="width:${pct(q.work, q.work_max)}%"></div></div>
+          <div class="row" style="margin-top:6px"><span class="label">Result</span><span class="value">${q.result}/${q.result_max}</span></div>
+          <div class="progress"><div class="progress-bar" style="width:${pct(q.result, q.result_max)}%"></div></div>
+          <div class="row" style="margin-top:6px"><span class="label">Processing</span><span class="value">${q.processing ?? '—'}</span></div>
+          <div class="row"><span class="label">Completed</span><span class="value">${q.completed ?? '—'}</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Workers</div>
+          <div class="row"><span class="label">Ativos</span><span class="value">${wk.active}/${wk.total}</span></div>
+          <div class="row"><span class="label">Utilização</span><span class="value">${fmt(wk.utilization_percent)}%</span></div>
+          <div class="row"><span class="label">Tempo médio</span><span class="value">${fmt(wk.avg_processing_ms)} ms</span></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Sistema (${sys.status || '—'})</div>
+          <div class="row"><span class="label">Uptime</span><span class="value">${fmt(sys.uptime_min)} min</span></div>
+          <div class="row"><span class="label">Memória</span><span class="value">${fmt(sys.memory_percent)}%</span></div>
+          <div class="progress"><div class="progress-bar ${memWarn?'warn':''}" style="width:${sys.memory_percent || 0}%"></div></div>
+          <div class="row" style="margin-top:6px"><span class="label">CPU</span><span class="value">${fmt(sys.cpu_percent)}%</span></div>
+          <div class="progress"><div class="progress-bar ${cpuWarn?'warn':''}" style="width:${sys.cpu_percent || 0}%"></div></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Watcher / APIs</div>
+          <div class="row"><span class="label">Estado</span><span class="value">${watcher.state || '—'}</span></div>
+          <div class="row"><span class="label">Descrição</span><span class="value" style="font-size:11px">${watcher.description || '—'}</span></div>
+          ${watcher.decision_timeout_remaining_min !== null && watcher.decision_timeout_remaining_min !== undefined ? `<div class="row"><span class="label">Timeout decisão</span><span class="value" style="color:#fcd34d">${fmt(watcher.decision_timeout_remaining_min)} min</span></div>` : ''}
+          ${'admin_backend' in apis ? `<div class="row"><span class="label">Admin backend</span><span class="value">${apis.admin_backend ? '✅' : '❌'}</span></div>` : ''}
+          ${'mmd' in apis ? `<div class="row"><span class="label">MMD</span><span class="value">${apis.mmd ? '✅' : '❌'}</span></div>` : ''}
+        </div>
+
+        ${d.finalization ? `
+          <div class="section">
+            <div class="section-title">Finalização</div>
+            <div class="row"><span class="label">Motivo</span><span class="value">${d.finalization.reason}</span></div>
+            <div class="row"><span class="label">Runtime</span><span class="value">${fmt(d.finalization.runtime_min)} min</span></div>
+            <div class="row"><span class="label">Coletas</span><span class="value">${d.finalization.collections}</span></div>
+            <div class="row"><span class="label">Taxa final</span><span class="value">${fmt(d.finalization.final_rate_per_min)} msg/min</span></div>
+            <div class="row"><span class="label">Sucesso final</span><span class="value">${fmt(d.finalization.final_success_rate_percent)}%</span></div>
+            <div class="row"><span class="label">Total final</span><span class="value">${d.finalization.final_total_processed ?? '—'}</span></div>
+            ${d.finalization.summary ? `<div class="row" style="margin-top:6px"><span class="label" style="color:#64748b;font-size:11px">${d.finalization.summary}</span></div>` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function render(payload) {
+    const data = payload.data || {};
+    $('taskId').textContent = data.task_id || '—';
+    $('lastUpdate').textContent = fmtTime(data.timestamp);
+
+    const v2Items = (data.dispatch_v2_data || []).map(d => ({ ...d, _version: 'v2' }));
+    const v3Items = (data.dispatch_v3_data || []).map(d => ({ ...d, _version: 'v3' }));
+
+    // Fallback para formato antigo (dispatch_data)
+    const legacyItems = (data.dispatch_data || []).map(d => ({ ...d, _version: '' }));
+
+    $('totalV2').textContent = data.dispatch_v2_total_records ?? data.dispatch_v2_total ?? v2Items.length;
+    $('totalV3').textContent = data.dispatch_v3_total_records ?? data.dispatch_v3_total ?? v3Items.length;
+
+    const items = [...v2Items, ...v3Items, ...legacyItems];
+    if (items.length === 0) {
+      cardsEl.innerHTML = '<div class="empty">Sem dispatches ativos no momento.</div>';
+    } else {
+      cardsEl.innerHTML = items.map(buildCard).join('');
+    }
+  }
+
+  function connect() {
+    const url = $('wsUrl').value.trim();
+    if (!url) return;
+    setStatus('connecting', 'Conectando...');
+    log('Conectando a ' + url, 'info');
+
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      log('Erro ao criar WebSocket: ' + e.message, 'error');
+      setStatus('disconnected', 'Erro');
+      return;
+    }
+
+    btnConnect.disabled = true;
+    btnDisconnect.disabled = false;
+
+    ws.onopen = () => {
+      setStatus('connected', 'Conectado');
+      log('Conexão estabelecida', 'success');
+    };
+
+    ws.onmessage = (event) => {
+      msgCount++;
+      $('msgCount').textContent = msgCount;
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'dispatch_status_update') {
+          render(payload);
+          log('Atualização recebida (' + (payload.data?.dispatch_data?.length || 0) + ' registros)', 'success');
+        } else {
+          log('Mensagem tipo "' + (payload.type || 'desconhecido') + '" recebida', 'info');
+        }
+      } catch (e) {
+        log('Erro ao parsear mensagem: ' + e.message, 'error');
+      }
+    };
+
+    ws.onerror = (e) => {
+      log('Erro WebSocket', 'error');
+    };
+
+    ws.onclose = (e) => {
+      setStatus('disconnected', 'Desconectado');
+      log('Conexão fechada' + (e.code ? ' (código ' + e.code + ')' : ''), 'info');
+      btnConnect.disabled = false;
+      btnDisconnect.disabled = true;
+      ws = null;
+    };
+  }
+
+  function disconnect() {
+    if (ws) {
+      ws.close();
+      log('Desconectando...', 'info');
+    }
+  }
+
+  btnConnect.addEventListener('click', connect);
+  btnDisconnect.addEventListener('click', disconnect);
+  $('wsUrl').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !btnConnect.disabled) connect();
+  });
+
+  log('Pronto. Clique em "Conectar" para iniciar.', 'info');
+})();
+</script>
+</body>
+</html>
