@@ -117,6 +117,22 @@
   }
   .version-tag.v2 { background: #312e81; color: #a5b4fc; }
   .version-tag.v3 { background: #134e4a; color: #5eead4; }
+  .tpl-ids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .tpl-id {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tpl-id.active   { background: #14532d; color: #86efac; }
+  .tpl-id.suspended { background: #451a03; color: #fcd34d; }
+  .tpl-id.paused   { background: #1e3a5f; color: #93c5fd; }
   .section {
     margin-top: 12px;
     padding-top: 12px;
@@ -270,7 +286,14 @@
           <div class="row"><span class="label">Dispatch ID</span><span class="value">${ex.dispatch_id ?? '—'}</span></div>
           <div class="row"><span class="label">Instância</span><span class="value">${ex.instance ?? '—'}</span></div>
           <div class="row"><span class="label">Total mensagens</span><span class="value">${ex.total_messages ?? '—'}</span></div>
-          <div class="row"><span class="label">Templates</span><span class="value">${ex.templates ? `${ex.templates.active} ativo / ${ex.templates.suspended} susp. / ${ex.templates.paused} pausado (total: ${ex.templates.total})` : '—'}</span></div>
+          ${ex.templates ? `
+            <div class="row"><span class="label">Templates</span><span class="value">${ex.templates.active} ativo / ${ex.templates.suspended} susp. / ${ex.templates.paused} pausado (total: ${ex.templates.total})</span></div>
+            <div class="tpl-ids">
+              ${(ex.templates.active_ids    || []).map(id => `<span class="tpl-id active">#${id}</span>`).join('')}
+              ${(ex.templates.suspended_ids || []).map(id => `<span class="tpl-id suspended">#${id}</span>`).join('')}
+              ${(ex.templates.paused_ids    || []).map(id => `<span class="tpl-id paused">#${id}</span>`).join('')}
+            </div>
+          ` : '<div class="row"><span class="label">Templates</span><span class="value">—</span></div>'}
         </div>
 
         <div class="section">
